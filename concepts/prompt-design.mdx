@@ -1,0 +1,287 @@
+---
+title: 'Prompt Design'
+description: 'Understanding how DeenPAL structures prompts to generate accurate, cited responses'
+---
+
+## Overview
+
+Prompt engineering is critical in RAG systems. DeenPAL's prompt design ensures that the LLM:
+
+1. Retrieves and presents relevant Hadiths
+2. Cites sources properly (book, chapter, Hadith number)
+3. Explains each Hadith in context of the user's question
+4. Provides a concise final answer
+
+Let's examine how DeenPAL achieves this through structured prompt templates.
+
+## The QA System Prompt
+
+Here's the complete system prompt from `prompts.py`:
+
+```python
+# From prompts.py
+qa_system_prompt = (
+    "You are an Islamic religious assistant for accurately retrieving hadiths for the question and giving a good, accurate response to that question accordingly. "
+    "Use the following pieces of retrieved hadiths from Sahih Al-Bukhari and Sahih Al-Muslim to answer the question. "
+    "First provide the retrieved hadiths with proper source, book number, hadith number, and chapter. "
+    "For each hadith, briefly explain that hadith according to the question, within 2-3 sentences maximum. "
+    "When all the hadiths and their short explanations are done, provide a short 3-sentence maximum answer to the question. "
+    "If you don't find any hadiths from any source to answer the question, just say that you there are no relevant hadiths you could find, "
+    "but if the user is directly asking you for help regarding something, like giving more examples to explain, or more questions that the user can ask, then help in that matter."
+    "\n\n"
+    "{context}"
+)
+```
+
+### Prompt Structure Breakdown
+
+The prompt has several key components:
+
+#### 1. Role Definition
+```
+"You are an Islamic religious assistant for accurately retrieving hadiths..."
+```
+<Info>
+Establishes the AI's role and primary objective, setting expectations for behavior.
+</Info>
+
+#### 2. Source Specification
+```
+"Use the following pieces of retrieved hadiths from Sahih Al-Bukhari and Sahih Al-Muslim..."
+```
+Instructs the LLM to use only the provided context, preventing hallucinations.
+
+#### 3. Citation Requirement
+```
+"First provide the retrieved hadiths with proper source, book number, hadith number, and chapter."
+```
+<Tip>
+Explicit instruction ensures every Hadith is properly attributed, enabling users to verify sources.
+</Tip>
+
+#### 4. Explanation Format
+```
+"For each hadith, briefly explain that hadith according to the question, within 2-3 sentences maximum."
+```
+Balances detail with conciseness, making responses digestible.
+
+#### 5. Summary Answer
+```
+"When all the hadiths and their short explanations are done, provide a short 3-sentence maximum answer to the question."
+```
+Provides a clear, concise conclusion after presenting evidence.
+
+#### 6. Fallback Handling
+```
+"If you don't find any hadiths from any source to answer the question, just say that you there are no relevant hadiths you could find..."
+```
+<Note>
+Handles edge cases gracefully when no relevant Hadiths are found, maintaining honesty and transparency.
+</Note>
+
+#### 7. Context Injection
+```
+"{context}"
+```
+Placeholder where retrieved Hadith chunks are injected by the RAG chain.
+
+## Instructions to the LLM
+
+The prompt provides a clear workflow:
+
+```
+┌─────────────────────────────────────┐
+│  Step 1: Present Retrieved Hadiths  │
+│  • Include source                   │
+│  • Include book number              │
+│  • Include hadith number            │
+│  • Include chapter                  │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  Step 2: Explain Each Hadith        │
+│  • 2-3 sentences per hadith         │
+│  • Relate to user's question        │
+│  • Keep it concise                  │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  Step 3: Provide Final Answer       │
+│  • Maximum 3 sentences              │
+│  • Synthesize all hadiths           │
+│  • Directly address question        │
+└─────────────────────────────────────┘
+```
+
+This structured approach ensures consistent, high-quality responses.
+
+## How Context is Injected
+
+The `{context}` placeholder is filled by the RAG chain with retrieved Hadith documents:
+
+```python
+# From chains.py
+from langchain.chains.combine_documents import create_stuff_documents_chain
+
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+```
+
+The `create_stuff_documents_chain` function:
+1. Receives retrieved documents from the retriever
+2. Formats them as text
+3. Injects them into the `{context}` placeholder
+4. Sends the complete prompt to the LLM
+
+<Info>
+LangChain handles the document formatting automatically, ensuring retrieved Hadiths are properly structured in the context.
+</Info>
+
+## ChatPromptTemplate Structure
+
+DeenPAL uses LangChain's `ChatPromptTemplate` to create a structured conversation:
+
+```python
+# From prompts.py
+from langchain.prompts import ChatPromptTemplate
+
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", qa_system_prompt),
+        ("human", "{input}"),
+    ]
+)
+```
+
+### Message Types
+
+#### System Message
+```python
+("system", qa_system_prompt)
+```
+
+Contains:
+- Role definition
+- Instructions
+- Context (retrieved Hadiths)
+
+This message sets the AI's behavior and provides necessary context.
+
+#### Human Message
+```python
+("human", "{input}")
+```
+
+Contains the user's actual question. The `{input}` placeholder is filled with the user's query at runtime.
+
+### Full Conversation Flow
+
+At runtime, the conversation looks like this:
+
+```
+[SYSTEM]
+You are an Islamic religious assistant for accurately retrieving hadiths...
+[Retrieved Hadith 1 text...]
+[Retrieved Hadith 2 text...]
+[Retrieved Hadith 3 text...]
+[Retrieved Hadith 4 text...]
+
+[HUMAN]
+What does Islam say about patience in difficult times?
+
+[ASSISTANT]
+[Generated response with citations and explanations...]
+```
+
+## Complete Prompt Integration
+
+Here's how the prompt flows through the system:
+
+```python
+# From chains.py
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_openai import ChatOpenAI
+from loader import load_and_prepare_data
+from prompts import qa_prompt
+
+# Load vector store and initialize retriever
+db, embeddings = load_and_prepare_data()
+retriever = db.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10}
+)
+
+# Initialize LLM
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+
+# Create chains
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+```
+
+### Execution Flow
+
+1. User submits a question
+2. `rag_chain` retrieves 4 diverse Hadiths using MMR
+3. `question_answer_chain` injects Hadiths into `{context}`
+4. Complete prompt (system + context + user question) sent to LLM
+5. LLM generates structured response following prompt instructions
+6. Response returned to user
+
+<Tip>
+The separation of concerns (retrieval, prompt template, LLM) makes the system modular and easy to maintain or modify.
+</Tip>
+
+## Example Response Format
+
+Based on the prompt design, a typical response looks like:
+
+```
+**Hadith 1** - Sahih Al-Bukhari, Book 8, Number 476, Chapter 12:
+[Hadith text...]
+
+This hadith teaches us that... [2-3 sentence explanation]
+
+**Hadith 2** - Sahih Al-Muslim, Book 3, Number 632, Chapter 5:
+[Hadith text...]
+
+This hadith shows that... [2-3 sentence explanation]
+
+**Hadith 3** - Sahih Al-Bukhari, Book 2, Number 145, Chapter 8:
+[Hadith text...]
+
+This hadith indicates that... [2-3 sentence explanation]
+
+**Hadith 4** - Sahih Al-Muslim, Book 7, Number 893, Chapter 15:
+[Hadith text...]
+
+This hadith demonstrates that... [2-3 sentence explanation]
+
+**Answer:** [3-sentence maximum synthesis of all hadiths addressing the user's question]
+```
+
+## Prompt Design Benefits
+
+### 1. Consistency
+Every response follows the same structure, making it easy for users to find information.
+
+### 2. Verifiability
+Proper citations enable users to cross-reference Hadiths with original sources.
+
+### 3. Clarity
+Separate explanations for each Hadith and a final summary prevent confusion.
+
+### 4. Conciseness
+Maximum sentence limits prevent overly long responses.
+
+### 5. Accuracy
+Instructions to use only retrieved context prevent hallucinations.
+
+<Note>
+Good prompt design is the foundation of a reliable RAG system. DeenPAL's structured approach ensures consistent, trustworthy responses.
+</Note>

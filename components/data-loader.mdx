@@ -1,0 +1,211 @@
+---
+title: "Data Loader"
+description: "Loading, processing, and embedding hadith documents for retrieval"
+---
+
+## Overview
+
+The `loader.py` module is responsible for loading hadith PDFs, processing them into searchable chunks, and storing them in a vector database. This is the foundation of DeenPAL's retrieval system.
+
+<Note>
+The data loading process only runs once when the app starts, thanks to Streamlit's `@st.cache_resource` decorator.
+</Note>
+
+## Core Function
+
+The `load_and_prepare_data()` function orchestrates the entire data preparation pipeline:
+
+```python
+import re
+import streamlit as st
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+@st.cache_resource
+def load_and_prepare_data():
+    print("1- Loading Hadith PDFs")
+    
+    folder_path = "data/"
+    loader = PyPDFDirectoryLoader(folder_path)
+    documents = loader.load()
+
+    # Metadata processing
+    for doc in documents:
+        split_source = (doc.metadata['source'].split("/")[-1])
+        exact_source_with_ext = split_source.split('_', maxsplit=1)[1]
+        exact_source = exact_source_with_ext.split('.')[0]
+        doc.metadata = {'source': exact_source}
+
+    print("2- Documents loaded successfully.")
+
+    # Splitting into chunks
+    pattern = r"(?:Chapter\s\d+:)|(?:Book\s\d+,\sNumber\s\d+:)"
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000, 
+        chunk_overlap=0, 
+        separators=[pattern], 
+        is_separator_regex=True
+    )
+    chunks = text_splitter.split_documents(documents)
+
+    # Adding metadata
+    for chunk in chunks:
+        matches = re.search(pattern, chunk.page_content)
+        if matches:
+            hadith_number = "".join([word for word in matches.group(0) if word.isdigit()])
+            chunk.metadata.update({'hadith_number': hadith_number})
+
+    print("3- Documents split and metadata added.")
+
+    # Generate embeddings
+    embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
+
+    # Store embeddings in Chroma
+    persist_directory = 'database/chroma_db'
+    db = Chroma.from_documents(
+        documents=chunks, 
+        embedding=embeddings, 
+        persist_directory=persist_directory
+    )
+
+    print("4- Chroma vector store initialized.")
+    return db, embeddings
+```
+
+## Pipeline Stages
+
+### 1. Loading PDFs with PyPDFDirectoryLoader
+
+The loader reads all PDF files from the `data/` directory:
+
+```python
+folder_path = "data/"
+loader = PyPDFDirectoryLoader(folder_path)
+documents = loader.load()
+```
+
+<Info>
+`PyPDFDirectoryLoader` automatically processes all PDFs in the specified directory, extracting text and basic metadata.
+</Info>
+
+### 2. Metadata Processing
+
+The loader extracts the source name from filenames by removing prefixes and extensions:
+
+```python
+for doc in documents:
+    split_source = (doc.metadata['source'].split("/")[-1])
+    exact_source_with_ext = split_source.split('_', maxsplit=1)[1]
+    exact_source = exact_source_with_ext.split('.')[0]
+    doc.metadata = {'source': exact_source}
+```
+
+**Example transformation:**
+- Input: `data/01_Sahih_Al-Bukhari.pdf`
+- Output metadata: `{'source': 'Sahih Al-Bukhari'}`
+
+### 3. Text Splitting with Regex Pattern
+
+Documents are split into chunks using a specialized regex pattern that recognizes hadith structure:
+
+```python
+pattern = r"(?:Chapter\s\d+:)|(?:Book\s\d+,\sNumber\s\d+:)"
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000, 
+    chunk_overlap=0, 
+    separators=[pattern], 
+    is_separator_regex=True
+)
+chunks = text_splitter.split_documents(documents)
+```
+
+<Note>
+**Regex Pattern Breakdown:**
+- `(?:Chapter\s\d+:)` - Matches "Chapter 5:" format
+- `(?:Book\s\d+,\sNumber\s\d+:)` - Matches "Book 1, Number 123:" format
+- These patterns split documents at natural hadith boundaries
+</Note>
+
+### 4. Adding Hadith Number Metadata
+
+After splitting, the loader extracts hadith numbers and adds them as metadata:
+
+```python
+for chunk in chunks:
+    matches = re.search(pattern, chunk.page_content)
+    if matches:
+        hadith_number = "".join([word for word in matches.group(0) if word.isdigit()])
+        chunk.metadata.update({'hadith_number': hadith_number})
+```
+
+This creates metadata like `{'hadith_number': '123'}` for each chunk.
+
+### 5. Generating Embeddings
+
+The loader uses HuggingFace's sentence transformers to create vector embeddings:
+
+```python
+embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
+```
+
+<Info>
+**Model:** `sentence-transformers/all-MiniLM-L6-v2`
+- Fast and efficient
+- 384-dimensional embeddings
+- Optimized for semantic similarity
+</Info>
+
+### 6. Initializing ChromaDB
+
+Finally, the embeddings are stored in a persistent ChromaDB vector store:
+
+```python
+persist_directory = 'database/chroma_db'
+db = Chroma.from_documents(
+    documents=chunks, 
+    embedding=embeddings, 
+    persist_directory=persist_directory
+)
+```
+
+## Caching with @st.cache_resource
+
+The `@st.cache_resource` decorator ensures this expensive operation only runs once:
+
+```python
+@st.cache_resource
+def load_and_prepare_data():
+    # ...
+```
+
+<Note>
+**Why `@st.cache_resource`?**
+- Prevents reloading data on every Streamlit rerun
+- Persists the database and embeddings across sessions
+- Significantly improves app performance
+</Note>
+
+## Return Values
+
+The function returns two objects:
+
+```python
+return db, embeddings
+```
+
+- `db`: ChromaDB vector store containing all document chunks
+- `embeddings`: HuggingFaceEmbeddings instance for consistent embedding generation
+
+## Usage in Other Modules
+
+Other modules import and use this function:
+
+```python
+from loader import load_and_prepare_data
+
+db, embeddings = load_and_prepare_data()
+```
+
+This provides the foundation for the retrieval chain and query processing.

@@ -1,0 +1,186 @@
+---
+title: 'prompts.py'
+description: 'Prompt templates for the QA system'
+---
+
+## Overview
+
+The `prompts.py` module defines the prompt templates used by the RAG system to generate accurate, contextual responses about Islamic hadiths.
+
+## Variables
+
+### qa_system_prompt
+
+<ResponseField name="qa_system_prompt" type="string">
+  The system prompt that defines the assistant's behavior and response format.
+</ResponseField>
+
+#### Full Prompt Text
+
+```python
+qa_system_prompt = (
+    "You are an Islamic religious assistant for accurately retrieving hadiths for the question and giving a good, accurate response to that question accordingly. "
+    "Use the following pieces of retrieved hadiths from Sahih Al-Bukhari and Sahih Al-Muslim to answer the question. "
+    "First provide the retrieved hadiths with proper source, book number, hadith number, and chapter. "
+    "For each hadith, briefly explain that hadith according to the question, within 2-3 sentences maximum. "
+    "When all the hadiths and their short explanations are done, provide a short 3-sentence maximum answer to the question. "
+    "If you don't find any hadiths from any source to answer the question, just say that you there are no relevant hadiths you could find, "
+    "but if the user is directly asking you for help regarding something, like giving more examples to explain, or more questions that the user can ask, then help in that matter."
+    "\n\n"
+    "{context}"
+)
+```
+
+#### Prompt Instructions
+
+The system prompt instructs the AI to:
+
+1. **Act as an Islamic religious assistant** focused on hadith retrieval
+2. **Use retrieved context** from Sahih Al-Bukhari and Sahih Al-Muslim
+3. **Provide structured responses**:
+   - List retrieved hadiths with full citation (source, book number, hadith number, chapter)
+   - Explain each hadith briefly (2-3 sentences max)
+   - Provide a concise final answer (3 sentences max)
+4. **Handle edge cases**:
+   - Acknowledge when no relevant hadiths are found
+   - Still help with meta-questions (examples, suggestions, clarifications)
+
+#### Template Variables
+
+<ParamField body="{context}" type="string" required>
+  Retrieved document context injected by the RAG chain. Contains relevant hadith passages.
+</ParamField>
+
+### qa_prompt
+
+<ResponseField name="qa_prompt" type="ChatPromptTemplate">
+  LangChain ChatPromptTemplate that structures the conversation with system and human messages.
+</ResponseField>
+
+#### Template Structure
+
+```python
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", qa_system_prompt),
+        ("human", "{input}"),
+    ]
+)
+```
+
+The template creates a two-message conversation:
+
+1. **System Message**: Contains the `qa_system_prompt` with instructions and retrieved context
+2. **Human Message**: Contains the user's question
+
+#### Input Variables
+
+<ParamField body="{context}" type="string" required>
+  Retrieved document context (automatically populated by the RAG chain).
+</ParamField>
+
+<ParamField body="{input}" type="string" required>
+  The user's question or query.
+</ParamField>
+
+## Usage with LangChain
+
+### Basic Usage
+
+```python
+from prompts import qa_prompt
+from langchain_openai import ChatOpenAI
+
+# Initialize LLM
+llm = ChatOpenAI(model="gpt-3.5-turbo")
+
+# Format the prompt
+formatted_prompt = qa_prompt.format_messages(
+    context="Retrieved hadith text here...",
+    input="What does Islam say about honesty?"
+)
+
+# Generate response
+response = llm.invoke(formatted_prompt)
+print(response.content)
+```
+
+### Integration with RAG Chain
+
+```python
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_openai import ChatOpenAI
+from prompts import qa_prompt
+
+llm = ChatOpenAI(model="deepseek/deepseek-chat-v3-0324:free")
+
+# Create document chain with the prompt
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+```
+
+### Custom Prompt Modification
+
+You can customize the prompt for different use cases:
+
+```python
+from langchain.prompts import ChatPromptTemplate
+
+# Create a modified prompt
+custom_qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "Your custom system prompt here with {context}"),
+        ("human", "{input}"),
+    ]
+)
+```
+
+## Response Format
+
+Given the prompt instructions, the AI generates responses in this format:
+
+```
+**Hadith 1: Sahih Al-Bukhari, Book X, Number Y, Chapter Z**
+[Hadith text]
+[Brief 2-3 sentence explanation]
+
+**Hadith 2: Sahih Muslim, Book A, Number B, Chapter C**
+[Hadith text]
+[Brief 2-3 sentence explanation]
+
+**Answer:**
+[Concise 3-sentence summary addressing the user's question]
+```
+
+## Dependencies
+
+- `langchain.prompts.ChatPromptTemplate`
+- `langchain.prompts.MessagesPlaceholder`
+- `langchain_core.messages.HumanMessage`
+- `langchain_core.messages.SystemMessage`
+
+## Best Practices
+
+<Tip>
+  The prompt is designed to ensure citations are always provided. This maintains transparency and allows users to verify information in authentic hadith sources.
+</Tip>
+
+<Warning>
+  When modifying the prompt, maintain the `{context}` placeholder to ensure retrieved documents are properly injected into the system message.
+</Warning>
+
+## Example Output
+
+With the question "What does Islam say about honesty?", the system produces:
+
+```
+**Hadith 1: Sahih Al-Bukhari, Book 46, Number 2749, Chapter: Truthfulness**
+"The Prophet (peace be upon him) said: 'Truthfulness leads to righteousness...'"
+This hadith emphasizes that honesty is a fundamental virtue in Islam. It shows how truthfulness creates a path to righteousness and ultimately Paradise.
+
+**Hadith 2: Sahih Muslim, Book 32, Number 6309, Chapter: The Virtue of Honesty**
+"A man asked the Prophet, 'What is faith?' He replied: 'When your good deed pleases you...'"
+This teaches that true faith includes being pleased with honest actions. The believer's conscience is at peace when they practice truthfulness.
+
+**Answer:**
+Islam places immense importance on honesty as a core moral principle. The Prophet Muhammad emphasized that truthfulness leads to righteousness and eventually Paradise, while lying leads to wickedness. A Muslim is expected to be truthful in all dealings, as honesty is a reflection of genuine faith.
+```

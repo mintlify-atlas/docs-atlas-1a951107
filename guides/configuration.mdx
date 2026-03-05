@@ -1,0 +1,277 @@
+---
+title: Configuration
+description: Configure DeenPAL with API keys and customize retrieval settings
+---
+
+DeenPAL requires configuration before use, including API keys for the language model and optional customization of retrieval parameters.
+
+## Environment Variables Setup
+
+<Steps>
+  <Step title="Create .env File">
+    Create a `.env` file in the project root directory:
+    
+    ```bash
+    touch .env
+    ```
+  </Step>
+
+  <Step title="Add API Key">
+    Open the `.env` file and add your API key:
+    
+    ```bash .env
+    DEEPSEEK_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    ```
+    
+    <Warning>
+    Keep your `.env` file secure and never commit it to version control. Add it to `.gitignore`.
+    </Warning>
+  </Step>
+</Steps>
+
+## API Key Configuration
+
+### Using OpenRouter API
+
+DeenPAL is configured to use DeepSeek via the OpenRouter API by default:
+
+```python chains.py
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+```
+
+To use this configuration:
+
+1. Sign up at [OpenRouter](https://openrouter.ai/)
+2. Get your API key from the dashboard
+3. Add it to your `.env` file as `DEEPSEEK_API_KEY`
+
+<Note>
+The `deepseek-chat-v3-0324:free` model is used, which provides free access through OpenRouter.
+</Note>
+
+### Alternative LLM Configurations
+
+You can modify `chains.py` to use different LLM providers:
+
+<CodeGroup>
+```python OpenAI Direct
+from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    model="gpt-4",
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+```
+
+```python Anthropic Claude
+from langchain_anthropic import ChatAnthropic
+
+llm = ChatAnthropic(
+    model="claude-3-sonnet-20240229",
+    api_key=os.getenv("ANTHROPIC_API_KEY")
+)
+```
+
+```python Local Model (Ollama)
+from langchain_community.llms import Ollama
+
+llm = Ollama(
+    model="llama2",
+    base_url="http://localhost:11434"
+)
+```
+</CodeGroup>
+
+<Warning>
+When changing LLM providers, ensure you update both the import statement and the environment variable name in your `.env` file.
+</Warning>
+
+## Retriever Parameters
+
+The retrieval system can be customized in `chains.py` to adjust how Hadiths are retrieved:
+
+### Current Configuration
+
+```python chains.py
+retriever = db.as_retriever(
+    search_type="mmr",  # Use Maximal Marginal Relevance
+    search_kwargs={"k": 4, "fetch_k": 10}
+)
+```
+
+### Parameter Explanations
+
+#### Search Type: MMR (Maximal Marginal Relevance)
+
+<Note>
+**Why MMR?**
+
+MMR provides diverse, relevant results instead of similar redundant ones. The project author tested both similarity-based and MMR retrieval, finding that MMR:
+- Increases diversity in retrieved Hadiths
+- Maintains relevance to the query
+- Helps the LLM provide different but related Hadiths
+- Avoids redundant responses
+</Note>
+
+#### k Parameter (Number of Results)
+
+- **Default:** `4`
+- **Purpose:** Number of diverse results returned to the LLM
+- **Range:** 1-10 recommended
+
+**Adjusting k:**
+```python
+search_kwargs={"k": 6, "fetch_k": 10}  # Return 6 diverse results
+```
+
+- **Lower k (1-3):** Faster responses, more focused answers
+- **Higher k (5-10):** More comprehensive answers, broader context
+
+#### fetch_k Parameter (Candidate Pool)
+
+- **Default:** `10`
+- **Purpose:** Number of candidates fetched before MMR selection
+- **Range:** Should be ≥ k
+
+**Adjusting fetch_k:**
+```python
+search_kwargs={"k": 4, "fetch_k": 20}  # Fetch 20, select 4 diverse
+```
+
+- **Lower fetch_k:** Faster retrieval, less diversity
+- **Higher fetch_k:** More diversity options, slower retrieval
+
+### Alternative Search Types
+
+You can also use similarity-based search:
+
+<CodeGroup>
+```python Similarity Search
+retriever = db.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 4}
+)
+```
+
+```python Similarity with Score Threshold
+retriever = db.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={"score_threshold": 0.5, "k": 4}
+)
+```
+</CodeGroup>
+
+<Warning>
+The project author found that `similarity_score_threshold` caused the chatbot to give redundant Hadiths. MMR is recommended for better results.
+</Warning>
+
+## Custom Prompts
+
+To customize how the chatbot responds, modify the prompts in `prompts.py`:
+
+### Default QA System Prompt
+
+```python prompts.py
+qa_system_prompt = (
+    "You are an Islamic religious assistant for accurately retrieving hadiths..."
+    "{context}"
+)
+```
+
+### Customizing the Prompt
+
+Create or modify `prompts.py` to adjust the chatbot's behavior:
+
+```python prompts.py
+from langchain_core.prompts import ChatPromptTemplate
+
+# Custom system prompt
+qa_system_prompt = (
+    "You are a knowledgeable Islamic scholar assistant. "
+    "Use the following Hadiths to answer questions accurately and respectfully.\n\n"
+    "Hadiths:\n{context}\n\n"
+    "Instructions:\n"
+    "1. Cite each Hadith with its source and number\n"
+    "2. Provide clear explanations\n"
+    "3. Be respectful and humble in tone\n"
+    "4. If unsure, acknowledge uncertainty"
+)
+
+# Create prompt template
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", qa_system_prompt),
+        ("human", "{input}"),
+    ]
+)
+```
+
+<Note>
+The `{context}` placeholder is automatically filled with retrieved Hadiths, and `{input}` contains the user's question.
+</Note>
+
+## Configuration Best Practices
+
+### Security
+- Never hardcode API keys in source files
+- Use `.env` for all sensitive configuration
+- Add `.env` to `.gitignore`
+- Rotate API keys periodically
+
+### Performance Tuning
+
+**For faster responses:**
+```python
+search_kwargs={"k": 2, "fetch_k": 5}
+```
+
+**For more comprehensive answers:**
+```python
+search_kwargs={"k": 6, "fetch_k": 15}
+```
+
+**Balanced (default):**
+```python
+search_kwargs={"k": 4, "fetch_k": 10}
+```
+
+## Verifying Configuration
+
+Test your configuration by running a simple query:
+
+```bash
+streamlit run app.py
+```
+
+If the app starts without errors and responds to queries, your configuration is correct.
+
+### Common Configuration Issues
+
+**API Key Not Found:**
+```
+Error: DEEPSEEK_API_KEY not found
+```
+Solution: Ensure `.env` exists and contains the correct key.
+
+**Invalid API Key:**
+```
+Error: 401 Unauthorized
+```
+Solution: Verify your API key is correct and active.
+
+**Model Not Found:**
+```
+Error: Model not found
+```
+Solution: Check the model name matches your provider's available models.
+
+## Next Steps
+
+With configuration complete, you're ready to:
+
+1. [Run the chatbot](/guides/running-chatbot)
+2. Test queries and evaluate responses
+3. Fine-tune retrieval parameters based on results

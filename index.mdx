@@ -1,97 +1,79 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "DeenPAL Documentation"
+description: "A RAG-based chatbot that provides accurate Islamic information from Hadith collections using retrieval-augmented generation."
 ---
 
-## Setting up
+<div style={{textAlign: 'center', padding: '40px 0'}}>
+  <h1 style={{fontSize: '48px', fontWeight: 700, marginBottom: '16px', color: '#1a1a1a'}}>DeenPAL</h1>
+  <p style={{fontSize: '18px', color: '#545454', maxWidth: '600px', margin: '0 auto'}}>
+    An intelligent Islamic chatbot powered by RAG technology to deliver accurate Hadith-based answers
+  </p>
+</div>
 
-Get your documentation site up and running in minutes.
+## What is DeenPAL?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+DeenPAL is a Retrieval-Augmented Generation (RAG) based chatbot designed to provide accurate and personalized Islamic information from trusted Hadith sources. Built on modern AI technologies, DeenPAL combines semantic search with large language models to deliver contextually relevant answers grounded in authentic Islamic texts from Sahih Bukhari and Sahih Muslim.
 
-## Make it yours
+## Key Features
 
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="RAG Architecture" icon="brain" href="/concepts/rag-architecture">
+    Leverages retrieval-augmented generation for accurate Hadith retrieval
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="MMR Retrieval" icon="magnifying-glass" href="/concepts/retrieval-strategy">
+    Uses Maximal Marginal Relevance for diverse and relevant results
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Semantic Search" icon="database" href="/components/data-loader">
+    ChromaDB vector store with sentence-transformers embeddings
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Interactive UI" icon="comments" href="/components/streamlit-ui">
+    Streamlit-based web interface with chat history
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Quick Start
 
-Everything you need to create world-class documentation.
+Get started with DeenPAL in just a few steps:
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/guides/installation">
+    Set up your environment and install dependencies
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Get DeenPAL running in minutes
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure API keys and settings
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="API Reference" icon="code" href="/api/loader">
+    Explore the complete API documentation
   </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## How It Works
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+DeenPAL processes Hadith collections through a sophisticated pipeline:
+
+1. **Data Loading** - Extracts and processes Hadith PDFs with metadata preservation
+2. **Semantic Splitting** - Chunks text based on Hadith structure (chapters and book numbers)
+3. **Vector Embedding** - Generates embeddings using sentence-transformers
+4. **Retrieval** - Finds relevant Hadiths using MMR-based search
+5. **Generation** - LLM synthesizes answers with proper citations
+
+<Note>
+DeenPAL uses the `all-MiniLM-L6-v2` model for embeddings and DeepSeek LLM via OpenRouter API for response generation.
+</Note>
+
+## Explore the Documentation
+
+<CardGroup cols={3}>
+  <Card title="Core Concepts" icon="book-open" href="/concepts/rag-architecture">
+    Learn about RAG, retrieval strategies, and prompt design
+  </Card>
+  <Card title="Guides" icon="map" href="/guides/installation">
+    Step-by-step tutorials for setup and usage
+  </Card>
+  <Card title="Components" icon="puzzle-piece" href="/components/data-loader">
+    Deep dive into each system component
+  </Card>
+</CardGroup>

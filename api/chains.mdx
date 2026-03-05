@@ -1,0 +1,179 @@
+---
+title: 'chains.py'
+description: 'RAG chain configuration and initialization'
+---
+
+## Overview
+
+The `chains.py` module sets up the complete RAG (Retrieval-Augmented Generation) pipeline, including the vector store, retriever, LLM, and chain components.
+
+## Module Exports
+
+The module exports the following variables that can be imported by other modules:
+
+- `rag_chain` - Complete RAG pipeline
+- `retriever` - MMR-based document retriever
+- `llm` - ChatOpenAI instance
+- `db` - Chroma vector store
+- `embeddings` - HuggingFace embeddings model
+
+## Variables
+
+### db
+
+<ResponseField name="db" type="Chroma">
+  The Chroma vector store loaded from the persisted database. Contains all Hadith document embeddings and metadata.
+</ResponseField>
+
+```python
+db, embeddings = load_and_prepare_data()
+```
+
+### embeddings
+
+<ResponseField name="embeddings" type="HuggingFaceEmbeddings">
+  HuggingFace embeddings model using `sentence-transformers/all-MiniLM-L6-v2` for vectorization.
+</ResponseField>
+
+### retriever
+
+<ResponseField name="retriever" type="VectorStoreRetriever">
+  MMR (Maximal Marginal Relevance) based retriever that fetches diverse, relevant documents from the vector store.
+</ResponseField>
+
+#### Configuration
+
+<ParamField body="search_type" type="string" default="mmr">
+  Search algorithm type. Uses Maximal Marginal Relevance to balance relevance and diversity.
+</ParamField>
+
+<ParamField body="k" type="integer" default="4">
+  Number of documents to return in retrieval results.
+</ParamField>
+
+<ParamField body="fetch_k" type="integer" default="10">
+  Number of candidate documents to fetch before MMR re-ranking.
+</ParamField>
+
+```python
+retriever = db.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10}
+)
+```
+
+### llm
+
+<ResponseField name="llm" type="ChatOpenAI">
+  Language model instance using DeepSeek Chat v3 through OpenRouter API.
+</ResponseField>
+
+#### Configuration
+
+<ParamField body="model" type="string" default="deepseek/deepseek-chat-v3-0324:free">
+  Model identifier for DeepSeek Chat v3 (free tier).
+</ParamField>
+
+<ParamField body="base_url" type="string" default="https://openrouter.ai/api/v1">
+  OpenRouter API endpoint for model access.
+</ParamField>
+
+```python
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+```
+
+<Note>
+  Requires `OPENAI_API_KEY` environment variable to be set with your OpenRouter API key.
+</Note>
+
+### rag_chain
+
+<ResponseField name="rag_chain" type="RunnableSequence">
+  Complete RAG pipeline that retrieves relevant documents and generates answers using the LLM.
+</ResponseField>
+
+The RAG chain is composed of:
+1. **Retriever**: Fetches relevant Hadith documents
+2. **Document Chain**: Combines retrieved documents with the prompt template
+3. **LLM**: Generates the final answer
+
+```python
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+```
+
+## Usage Example
+
+```python
+from chains import rag_chain
+
+# Invoke the RAG chain with a question
+response = rag_chain.invoke({
+    "input": "What does Islam say about charity?",
+    "chat_history": []
+})
+
+# Access the generated answer
+print(response["answer"])
+
+# Access retrieved context documents
+print(response["context"])
+```
+
+## Input Format
+
+<ParamField body="input" type="string" required>
+  The user's question or query.
+</ParamField>
+
+<ParamField body="chat_history" type="list" required>
+  List of previous messages for conversation context. Each message should be a dictionary with `role` and `content` keys.
+</ParamField>
+
+```python
+{
+    "input": "What are the pillars of Islam?",
+    "chat_history": [
+        {"role": "user", "content": "Previous question"},
+        {"role": "assistant", "content": "Previous answer"}
+    ]
+}
+```
+
+## Output Format
+
+<ResponseField name="answer" type="string">
+  The generated response from the LLM based on retrieved Hadith documents.
+</ResponseField>
+
+<ResponseField name="context" type="list[Document]">
+  List of retrieved documents used to generate the answer.
+</ResponseField>
+
+<ResponseField name="input" type="string">
+  Echo of the original input question.
+</ResponseField>
+
+## Dependencies
+
+- `langchain.chains.create_retrieval_chain`
+- `langchain.chains.combine_documents.create_stuff_documents_chain`
+- `langchain_openai.ChatOpenAI`
+- `dotenv.load_dotenv`
+- `loader.load_and_prepare_data`
+- `prompts.qa_prompt`
+
+## Environment Variables
+
+<ParamField body="OPENAI_API_KEY" type="string" required>
+  Your OpenRouter API key for accessing the DeepSeek model.
+</ParamField>
+
+Create a `.env` file in your project root:
+
+```bash
+OPENAI_API_KEY=your_openrouter_api_key_here
+```

@@ -1,0 +1,231 @@
+---
+title: "Prompt Templates"
+description: "System prompts and message templates for hadith question-answering"
+---
+
+## Overview
+
+The `prompts.py` module defines the prompt template that guides the LLM's behavior when answering questions about hadiths.
+
+<Info>
+A well-crafted prompt is crucial for accurate, structured responses that properly cite hadith sources.
+</Info>
+
+## Complete Module Code
+
+```python
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, SystemMessage
+
+# Prompt Template for QA System
+qa_system_prompt = (
+    "You are an Islamic religious assistant for accurately retrieving hadiths for the question and giving a good, accurate response to that question accordingly. "
+    "Use the following pieces of retrieved hadiths from Sahih Al-Bukhari and Sahih Al-Muslim to answer the question. "
+    "First provide the retrieved hadiths with proper source, book number, hadith number, and chapter. "
+    "For each hadith, briefly explain that hadith according to the question, within 2-3 sentences maximum. "
+    "When all the hadiths and their short explanations are done, provide a short 3-sentence maximum answer to the question. "
+    "If you don't find any hadiths from any source to answer the question, just say that you there are no relevant hadiths you could find, "
+    "but if the user is directly asking you for help regarding something, like giving more examples to explain, or more questions that the user can ask, then help in that matter."
+    "\n\n"
+    "{context}"
+)
+
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", qa_system_prompt),
+        ("human", "{input}"),
+    ]
+)
+```
+
+## System Prompt Structure
+
+The `qa_system_prompt` defines the assistant's role and behavior:
+
+### 1. Role Definition
+
+```python
+"You are an Islamic religious assistant for accurately retrieving hadiths for the question and giving a good, accurate response to that question accordingly."
+```
+
+Establishes the AI as a specialized Islamic Q&A assistant focused on hadith retrieval.
+
+### 2. Source Specification
+
+```python
+"Use the following pieces of retrieved hadiths from Sahih Al-Bukhari and Sahih Al-Muslim to answer the question."
+```
+
+<Note>
+Limits the assistant to using only the provided hadith collections, ensuring authenticity and traceability.
+</Note>
+
+### 3. Citation Instructions
+
+```python
+"First provide the retrieved hadiths with proper source, book number, hadith number, and chapter."
+```
+
+Requires structured citations with:
+- **Source**: Collection name (e.g., "Sahih Al-Bukhari")
+- **Book Number**: The book within the collection
+- **Hadith Number**: Unique hadith identifier
+- **Chapter**: Chapter name or number
+
+### 4. Explanation Format
+
+```python
+"For each hadith, briefly explain that hadith according to the question, within 2-3 sentences maximum."
+```
+
+Ensures concise, relevant explanations for each hadith:
+- Maximum 2-3 sentences per hadith
+- Focused on answering the user's question
+- Prevents overly lengthy responses
+
+### 5. Summary Answer
+
+```python
+"When all the hadiths and their short explanations are done, provide a short 3-sentence maximum answer to the question."
+```
+
+Provides a final synthesis:
+- Summarizes the collective wisdom from all hadiths
+- Maximum 3 sentences
+- Directly answers the original question
+
+### 6. Fallback Behavior
+
+```python
+"If you don't find any hadiths from any source to answer the question, just say that you there are no relevant hadiths you could find, "
+"but if the user is directly asking you for help regarding something, like giving more examples to explain, or more questions that the user can ask, then help in that matter."
+```
+
+<Info>
+Handles two scenarios:
+1. **No relevant hadiths**: Honestly states unavailability
+2. **Meta-questions**: Still helps with clarifications, examples, or question suggestions
+</Info>
+
+### 7. Context Placeholder
+
+```python
+"{context}"
+```
+
+This placeholder is replaced with the retrieved hadith documents during execution.
+
+## ChatPromptTemplate Construction
+
+The template uses LangChain's message-based format:
+
+```python
+qa_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", qa_system_prompt),
+        ("human", "{input}"),
+    ]
+)
+```
+
+### Message Roles
+
+1. **System Message**: Contains the instructions and context
+   ```python
+   ("system", qa_system_prompt)
+   ```
+
+2. **Human Message**: Contains the user's question
+   ```python
+   ("human", "{input}")
+   ```
+
+<Note>
+This structure follows the standard chat format used by modern LLMs:
+- System message sets behavior
+- Human message provides the query
+- Assistant responds based on system instructions
+</Note>
+
+## Template Variables
+
+The prompt uses two placeholders:
+
+| Variable | Location | Purpose | Filled By |
+|----------|----------|---------|----------|
+| `{context}` | System prompt | Retrieved hadith documents | Retrieval chain |
+| `{input}` | Human message | User's question | User input |
+
+## Example Execution
+
+When invoked with:
+
+```python
+input = "What does Islam say about honesty?"
+context = [hadith1, hadith2, hadith3]  # Retrieved documents
+```
+
+The final prompt becomes:
+
+```
+System: You are an Islamic religious assistant...
+        [Full instructions]
+        
+        [Retrieved Hadith 1 text]
+        [Retrieved Hadith 2 text]
+        [Retrieved Hadith 3 text]
+
+Human: What does Islam say about honesty?
+```
+
+## Expected Response Format
+
+Based on the prompt, the LLM should respond like:
+
+```
+**Hadith 1:**
+Source: Sahih Al-Bukhari, Book 2, Chapter 5, Hadith 123
+[Hadith text]
+
+This hadith emphasizes that honesty is a fundamental trait of a believer. It teaches that truthfulness leads to righteousness and ultimately to Paradise.
+
+**Hadith 2:**
+[Similar format]
+
+**Summary:**
+Islam places great importance on honesty in all aspects of life. The hadiths emphasize that truthfulness is essential for faith and leads to divine reward. Muslims are encouraged to be honest even in difficult situations.
+```
+
+## Usage in Chains
+
+The prompt is imported and used in `chains.py`:
+
+```python
+from prompts import qa_prompt
+from langchain.chains.combine_documents import create_stuff_documents_chain
+
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+```
+
+## Design Considerations
+
+<Info>
+**Why this structure?**
+
+1. **Accuracy**: Restricts answers to authentic sources
+2. **Transparency**: Requires proper citations
+3. **Conciseness**: Limits explanation length
+4. **Completeness**: Provides both details and summary
+5. **Honesty**: Handles missing information gracefully
+</Info>
+
+## Dependencies
+
+The module requires:
+
+```python
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, SystemMessage
+```
+
+Though `MessagesPlaceholder`, `HumanMessage`, and `SystemMessage` are imported, they're not directly used in the current implementation - the template is constructed using tuple notation.

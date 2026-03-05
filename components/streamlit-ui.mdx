@@ -1,0 +1,342 @@
+---
+title: "Streamlit UI"
+description: "Interactive chat interface for the DeenPAL hadith assistant"
+---
+
+## Overview
+
+The `app.py` module creates the user-facing Streamlit application, providing an interactive chat interface for querying hadiths.
+
+<Info>
+This is the entry point for users - a clean, conversational interface for asking questions about Islam.
+</Info>
+
+## Complete Module Code
+
+```python
+import streamlit as st
+from chains import rag_chain
+
+# Streamlit App UI
+st.title("Deen Pal Chatbot")
+
+# Chat History State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display Chat History
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Accept User Input
+if prompt := st.chat_input("Please type your question"):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # Store User Query
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # Perform Retrieval and Generate Answer
+    response = rag_chain.invoke({"input": prompt, "chat_history": st.session_state.messages})
+
+    with st.chat_message("assistant"):
+        st.markdown(response["answer"])
+
+    # Store Assistant Response
+    st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
+```
+
+## Application Structure
+
+### 1. Title and Setup
+
+```python
+import streamlit as st
+from chains import rag_chain
+
+st.title("Deen Pal Chatbot")
+```
+
+- Imports the RAG chain from `chains.py`
+- Sets the page title to "Deen Pal Chatbot"
+
+### 2. Session State for Chat History
+
+Streamlit uses `st.session_state` to persist data across reruns:
+
+```python
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+```
+
+<Note>
+**Why Session State?**
+
+Streamlit reruns the entire script on every interaction. Without session state, the chat history would be lost after each message.
+</Note>
+
+The `messages` list stores conversation history:
+
+```python
+[
+    {"role": "user", "content": "What is prayer in Islam?"},
+    {"role": "assistant", "content": "Prayer (Salah) is..."},
+    {"role": "user", "content": "How many times per day?"},
+    {"role": "assistant", "content": "Muslims pray five times..."}
+]
+```
+
+### 3. Displaying Chat History
+
+The app renders all previous messages:
+
+```python
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+```
+
+**Breakdown:**
+- Loop through all stored messages
+- `st.chat_message(role)`: Creates a chat bubble with appropriate styling
+  - `"user"`: Right-aligned, different color
+  - `"assistant"`: Left-aligned, different color
+- `st.markdown()`: Renders message content with markdown support
+
+<Info>
+Streamlit's `st.chat_message()` automatically handles:
+- Message styling
+- Avatar display
+- Proper alignment
+- Visual distinction between roles
+</Info>
+
+### 4. User Input with st.chat_input
+
+The chat input box at the bottom of the page:
+
+```python
+if prompt := st.chat_input("Please type your question"):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+```
+
+**Walrus Operator (`:=`):**
+```python
+if prompt := st.chat_input(...):
+```
+
+This:
+1. Calls `st.chat_input()`
+2. Assigns the return value to `prompt`
+3. Checks if `prompt` is not None (user pressed Enter)
+
+<Note>
+`st.chat_input()` returns:
+- The user's text if they press Enter
+- `None` if no input yet
+</Note>
+
+### 5. Storing User Query
+
+Immediately save the user's message:
+
+```python
+st.session_state.messages.append({"role": "user", "content": prompt})
+```
+
+This ensures the conversation history includes the current question.
+
+### 6. Invoking the RAG Chain
+
+The core retrieval and generation step:
+
+```python
+response = rag_chain.invoke({
+    "input": prompt, 
+    "chat_history": st.session_state.messages
+})
+```
+
+**Parameters:**
+- `input`: The current user question
+- `chat_history`: Full conversation context (for multi-turn conversations)
+
+**Response structure:**
+```python
+{
+    "input": "user's question",
+    "context": [retrieved_hadith1, retrieved_hadith2, ...],
+    "answer": "generated answer with citations"
+}
+```
+
+<Info>
+**What happens during invoke:**
+1. User's question is embedded as a vector
+2. ChromaDB retrieves relevant hadiths (MMR search)
+3. Retrieved documents are stuffed into the prompt
+4. DeepSeek LLM generates a structured answer
+5. Response is returned to the UI
+</Info>
+
+### 7. Displaying the Assistant's Response
+
+Show the generated answer to the user:
+
+```python
+with st.chat_message("assistant"):
+    st.markdown(response["answer"])
+```
+
+- Creates an assistant chat bubble
+- Renders the answer with markdown formatting
+- Supports bold, italics, lists, etc.
+
+### 8. Storing Assistant Response
+
+Finally, save the assistant's answer to history:
+
+```python
+st.session_state.messages.append({
+    "role": "assistant", 
+    "content": response["answer"]
+})
+```
+
+This completes the conversation loop and enables follow-up questions.
+
+## User Experience Flow
+
+1. **User opens app**
+   - Sees "Deen Pal Chatbot" title
+   - Empty chat interface
+   - Input box at bottom
+
+2. **User types question**
+   - "What does Islam say about honesty?"
+   - Presses Enter
+
+3. **Message appears**
+   - User's question shown in user bubble
+   - Loading indicator while processing
+
+4. **Assistant responds**
+   - Retrieved hadiths with citations
+   - Brief explanations
+   - Summary answer
+   - All in assistant bubble
+
+5. **Conversation continues**
+   - User can ask follow-up questions
+   - Full context maintained
+   - Previous messages remain visible
+
+## Key Streamlit Components
+
+| Component | Purpose | Code |
+|-----------|---------|------|
+| `st.title()` | Page title | `st.title("Deen Pal Chatbot")` |
+| `st.session_state` | Persist data | `st.session_state.messages` |
+| `st.chat_message()` | Chat bubble | `with st.chat_message("user"):` |
+| `st.markdown()` | Render text | `st.markdown(content)` |
+| `st.chat_input()` | Input box | `st.chat_input("placeholder")` |
+
+## Running the Application
+
+To launch the app:
+
+```bash
+streamlit run app.py
+```
+
+Streamlit will:
+1. Load all dependencies
+2. Initialize the data loader (via `@st.cache_resource`)
+3. Build the RAG chain
+4. Open browser at `http://localhost:8501`
+5. Display the chat interface
+
+<Note>
+**First Run:**
+The initial startup takes longer because:
+- PDFs are loaded and processed
+- Embeddings are generated
+- ChromaDB is initialized
+
+Subsequent runs are fast thanks to caching.
+</Note>
+
+## Design Choices
+
+### Simple and Clean
+
+The UI is intentionally minimal:
+- No complex sidebars or settings
+- Focus on conversation
+- Familiar chat interface
+
+### Stateful Conversations
+
+Chat history enables:
+- Follow-up questions
+- Context-aware responses
+- Natural conversation flow
+
+### Markdown Support
+
+Using `st.markdown()` allows:
+- Formatted hadith citations
+- Structured responses
+- Better readability
+
+## Error Handling
+
+<Info>
+**Current implementation:**
+No explicit error handling. If the RAG chain fails, Streamlit will display an error.
+
+**Production consideration:**
+Wrap the `rag_chain.invoke()` call in a try-except block to handle:
+- API failures
+- Network issues
+- Invalid responses
+</Info>
+
+## Dependencies
+
+```python
+import streamlit as st
+from chains import rag_chain
+```
+
+Minimal dependencies:
+- **Streamlit**: Web framework
+- **chains.py**: Provides the RAG pipeline
+
+## Customization Opportunities
+
+The simple structure allows easy extensions:
+
+1. **Add sidebar settings**
+   ```python
+   with st.sidebar:
+       st.slider("Number of hadiths", 1, 10, 4)
+   ```
+
+2. **Stream responses**
+   ```python
+   # For word-by-word streaming
+   ```
+
+3. **Export conversation**
+   ```python
+   st.download_button("Download chat", chat_history)
+   ```
+
+4. **Clear chat button**
+   ```python
+   if st.button("Clear chat"):
+       st.session_state.messages = []
+   ```

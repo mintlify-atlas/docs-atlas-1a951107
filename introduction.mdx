@@ -1,0 +1,92 @@
+---
+title: Introduction
+description: Learn about DeenPAL, a RAG-based Islamic chatbot that provides accurate responses based on authentic Hadith sources
+---
+
+## What is DeenPAL?
+
+DeenPAL is a **Retrieval-Augmented Generation (RAG)** based chatbot designed to provide accurate and personalized Islamic information to users based on authentic Hadiths from Sahih Al-Bukhari and Sahih Muslim.
+
+Unlike traditional chatbots that rely solely on pre-trained knowledge, DeenPAL retrieves relevant Hadiths from a curated database and uses advanced language models to generate contextually appropriate responses with proper citations.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Personalized Responses" icon="user">
+    Delivers tailored information based on user queries, ensuring each answer is relevant to your specific question.
+  </Card>
+  <Card title="Reliable Sources" icon="book">
+    Utilizes trusted Hadith sources (Sahih Al-Bukhari and Sahih Muslim) to ensure information accuracy and authenticity.
+  </Card>
+  <Card title="Interactive Interface" icon="comments">
+    Engages users through a conversational platform powered by Streamlit for seamless interaction.
+  </Card>
+  <Card title="Smart Retrieval" icon="brain">
+    Uses Maximal Marginal Relevance (MMR) to retrieve diverse yet relevant Hadiths, avoiding redundant responses.
+  </Card>
+</CardGroup>
+
+## Technology Stack
+
+DeenPAL is built using modern AI and data processing technologies:
+
+- **LangChain**: Framework for building RAG pipelines and managing retrieval-generation workflows
+- **ChromaDB**: Vector database for efficient semantic search and Hadith retrieval
+- **Streamlit**: Interactive web interface for user-friendly chat experience
+- **DeepSeek**: Large language model for generating accurate and contextual responses
+- **HuggingFace Embeddings**: `sentence-transformers/all-MiniLM-L6-v2` for creating semantic embeddings
+- **Python 3.10**: Core programming language
+
+## How It Works
+
+DeenPAL follows a structured RAG approach:
+
+<Steps>
+  <Step title="Data Preparation">
+    Hadith PDFs are loaded from the `data/` directory, split into semantic chunks (by chapter and hadith number), and converted into embeddings stored in ChromaDB.
+  </Step>
+  
+  <Step title="Query Processing">
+    When you ask a question, DeenPAL uses semantic search with MMR to retrieve the 4 most relevant and diverse Hadiths from a pool of 10 candidates.
+  </Step>
+  
+  <Step title="Response Generation">
+    The retrieved Hadiths are provided to the language model along with your query to generate a comprehensive answer with proper citations.
+  </Step>
+  
+  <Step title="Citation and Explanation">
+    Each response includes the Hadith text, source details (book number, hadith number, chapter), and a brief explanation before answering your question.
+  </Step>
+</Steps>
+
+## Use Cases
+
+DeenPAL is designed for:
+
+- **Students of Islamic Studies**: Research authentic Hadith references quickly
+- **Scholars and Educators**: Find relevant Hadiths with proper citations for teaching
+- **General Users**: Learn about Islamic teachings from authentic sources
+- **Researchers**: Explore Hadith collections with semantic search capabilities
+
+## Benefits
+
+<Note>
+  DeenPAL ensures all responses are grounded in authentic Hadith texts, reducing the risk of hallucinations common in traditional LLMs.
+</Note>
+
+- **Accuracy**: Responses are based on actual Hadith texts, not generated knowledge
+- **Traceability**: Every answer includes source citations for verification
+- **Diversity**: MMR-based retrieval provides varied perspectives from different Hadiths
+- **Efficiency**: Cached data loading ensures fast response times
+- **Transparency**: Clear separation between retrieved Hadiths and AI-generated explanations
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get DeenPAL up and running in minutes with our step-by-step guide.
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/concepts/rag-architecture">
+    Learn about the technical architecture and design decisions behind DeenPAL.
+  </Card>
+</CardGroup>

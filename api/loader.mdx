@@ -1,0 +1,104 @@
+---
+title: 'loader.py'
+description: 'Data loading and vector store initialization'
+---
+
+## Overview
+
+The `loader.py` module handles loading Hadith PDFs, processing them into chunks, generating embeddings, and initializing the Chroma vector database.
+
+## Functions
+
+### load_and_prepare_data()
+
+Loads PDF documents from the `data/` directory, splits them into chunks, generates embeddings, and creates a Chroma vector store. This function is decorated with `@st.cache_resource` to ensure it only runs once per Streamlit session.
+
+<ParamField body="None" type="void">
+  This function takes no parameters.
+</ParamField>
+
+#### Returns
+
+<ResponseField name="db" type="Chroma">
+  The initialized Chroma vector store containing all document embeddings and metadata.
+</ResponseField>
+
+<ResponseField name="embeddings" type="HuggingFaceEmbeddings">
+  The HuggingFace embeddings model (`sentence-transformers/all-MiniLM-L6-v2`) used for vectorization.
+</ResponseField>
+
+#### Processing Steps
+
+1. **PDF Loading**: Loads all PDFs from the `data/` directory using `PyPDFDirectoryLoader`
+2. **Metadata Extraction**: Extracts source names from file paths and updates document metadata
+3. **Text Splitting**: Splits documents into chunks using regex patterns to identify hadith boundaries:
+   - Pattern: `Chapter \d+:` or `Book \d+, Number \d+:`
+   - Chunk size: 1000 characters
+   - Chunk overlap: 0
+4. **Metadata Enhancement**: Extracts hadith numbers from text and adds to chunk metadata
+5. **Embedding Generation**: Creates embeddings using `sentence-transformers/all-MiniLM-L6-v2`
+6. **Vector Store Creation**: Stores embeddings in Chroma database
+
+#### Side Effects
+
+<Warning>
+  This function creates a `database/chroma_db/` directory in the project root to persist the vector store.
+</Warning>
+
+#### Function Signature
+
+```python
+@st.cache_resource
+def load_and_prepare_data():
+    # ... implementation
+    return db, embeddings
+```
+
+## Example Usage
+
+```python
+from loader import load_and_prepare_data
+
+# Initialize vector store and embeddings
+db, embeddings = load_and_prepare_data()
+
+# Use the database for retrieval
+retriever = db.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10}
+)
+
+# Search for relevant documents
+results = retriever.invoke("What does Islam say about prayer?")
+```
+
+## Dependencies
+
+- `langchain_community.document_loaders.PyPDFDirectoryLoader`
+- `langchain_text_splitters.RecursiveCharacterTextSplitter`
+- `langchain_huggingface.HuggingFaceEmbeddings`
+- `langchain_chroma.Chroma`
+- `streamlit` (for caching)
+- `re` (for regex pattern matching)
+
+## Configuration
+
+<ParamField body="folder_path" type="string" default="data/">
+  Directory containing Hadith PDF files
+</ParamField>
+
+<ParamField body="persist_directory" type="string" default="database/chroma_db">
+  Directory where Chroma vector store is persisted
+</ParamField>
+
+<ParamField body="chunk_size" type="integer" default="1000">
+  Maximum size of each text chunk in characters
+</ParamField>
+
+<ParamField body="chunk_overlap" type="integer" default="0">
+  Number of overlapping characters between chunks
+</ParamField>
+
+<ParamField body="model_name" type="string" default="sentence-transformers/all-MiniLM-L6-v2">
+  HuggingFace embedding model identifier
+</ParamField>

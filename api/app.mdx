@@ -1,0 +1,291 @@
+---
+title: 'app.py'
+description: 'Streamlit application entry point'
+---
+
+## Overview
+
+The `app.py` module is the main entry point for the DeenPAL Streamlit web application. It provides an interactive chat interface for users to ask questions about Islamic hadiths and receive AI-generated responses.
+
+## Application Structure
+
+### Entry Point
+
+Run the application using Streamlit:
+
+```bash
+streamlit run app.py
+```
+
+## Session State Variables
+
+Streamlit uses session state to persist data across reruns.
+
+<ResponseField name="messages" type="list[dict]">
+  Stores the complete chat history for the current session. Each message is a dictionary with `role` and `content` keys.
+</ResponseField>
+
+#### Message Structure
+
+```python
+{
+    "role": "user" | "assistant",
+    "content": "Message text"
+}
+```
+
+#### Initialization
+
+```python
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+```
+
+## UI Components
+
+### Page Title
+
+```python
+st.title("Deen Pal Chatbot")
+```
+
+Displays the application title at the top of the page.
+
+### Chat History Display
+
+```python
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+```
+
+Renders all previous messages in the conversation with appropriate styling for user and assistant roles.
+
+### Chat Input
+
+```python
+if prompt := st.chat_input("Please type your question"):
+    # Handle user input
+```
+
+Provides a text input field at the bottom of the page for users to enter questions. Uses the walrus operator (`:=`) for assignment and condition checking.
+
+## Message Handling Flow
+
+### 1. User Input Display
+
+```python
+with st.chat_message("user"):
+    st.markdown(prompt)
+```
+
+Immediately displays the user's question in the chat interface.
+
+### 2. Store User Message
+
+```python
+st.session_state.messages.append({"role": "user", "content": prompt})
+```
+
+Adds the user's message to the session state for persistence.
+
+### 3. RAG Chain Invocation
+
+```python
+response = rag_chain.invoke({
+    "input": prompt,
+    "chat_history": st.session_state.messages
+})
+```
+
+Calls the RAG chain with the current question and full chat history for context-aware responses.
+
+#### Input Format
+
+<ParamField body="input" type="string" required>
+  The user's current question.
+</ParamField>
+
+<ParamField body="chat_history" type="list[dict]" required>
+  Complete conversation history including previous questions and answers.
+</ParamField>
+
+#### Response Format
+
+<ResponseField name="answer" type="string">
+  The generated response from the LLM containing hadith citations and explanations.
+</ResponseField>
+
+<ResponseField name="context" type="list[Document]">
+  Retrieved document chunks used to generate the answer (not displayed in UI).
+</ResponseField>
+
+### 4. Assistant Response Display
+
+```python
+with st.chat_message("assistant"):
+    st.markdown(response["answer"])
+```
+
+Displays the AI-generated response in the chat interface with assistant styling.
+
+### 5. Store Assistant Response
+
+```python
+st.session_state.messages.append({
+    "role": "assistant",
+    "content": response["answer"]
+})
+```
+
+Adds the assistant's response to session state for conversation continuity.
+
+## Complete Application Code
+
+```python
+import streamlit as st
+from chains import rag_chain
+
+# Streamlit App UI
+st.title("Deen Pal Chatbot")
+
+# Chat History State
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display Chat History
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Accept User Input
+if prompt := st.chat_input("Please type your question"):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # Store User Query
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # Perform Retrieval and Generate Answer
+    response = rag_chain.invoke({"input": prompt, "chat_history": st.session_state.messages})
+
+    with st.chat_message("assistant"):
+        st.markdown(response["answer"])
+
+    # Store Assistant Response
+    st.session_state.messages.append({"role": "assistant", "content": response["answer"]})
+```
+
+## Usage Example
+
+### Starting the Application
+
+1. Install dependencies:
+```bash
+pip install streamlit langchain langchain-openai langchain-community langchain-chroma langchain-huggingface
+```
+
+2. Set up environment variables:
+```bash
+echo "OPENAI_API_KEY=your_openrouter_api_key" > .env
+```
+
+3. Run the application:
+```bash
+streamlit run app.py
+```
+
+### User Interaction Flow
+
+1. User opens the web application in browser
+2. User types a question: "What does Islam say about prayer?"
+3. Application displays the question immediately
+4. RAG chain retrieves relevant hadiths and generates response
+5. Application displays the AI-generated answer with citations
+6. Conversation continues with full context maintained
+
+## Dependencies
+
+- `streamlit` - Web application framework
+- `chains.rag_chain` - RAG pipeline for question answering
+
+## Features
+
+<Check>
+  **Persistent Chat History** - Maintains conversation context throughout the session
+</Check>
+
+<Check>
+  **Real-time Response** - Displays messages instantly as they're processed
+</Check>
+
+<Check>
+  **Context-Aware** - Sends full chat history to RAG chain for better responses
+</Check>
+
+<Check>
+  **Clean UI** - Uses Streamlit's native chat components for professional appearance
+</Check>
+
+## Configuration Options
+
+### Customizing the UI
+
+You can modify the appearance by adding Streamlit configuration:
+
+```python
+st.set_page_config(
+    page_title="DeenPAL - Islamic Q&A",
+    page_icon="📿",
+    layout="wide"
+)
+```
+
+### Adding Sidebar Information
+
+```python
+with st.sidebar:
+    st.header("About DeenPAL")
+    st.write("Ask questions about Islamic hadiths from Sahih Al-Bukhari and Sahih Muslim.")
+```
+
+### Chat History Management
+
+Add a button to clear chat history:
+
+```python
+if st.sidebar.button("Clear Chat History"):
+    st.session_state.messages = []
+    st.rerun()
+```
+
+## Performance Considerations
+
+<Info>
+  The `load_and_prepare_data()` function in `chains.py` is cached with `@st.cache_resource`, ensuring the vector database is only initialized once per session, significantly improving performance.
+</Info>
+
+## Error Handling
+
+For production use, consider adding error handling:
+
+```python
+try:
+    response = rag_chain.invoke({
+        "input": prompt,
+        "chat_history": st.session_state.messages
+    })
+    with st.chat_message("assistant"):
+        st.markdown(response["answer"])
+except Exception as e:
+    st.error(f"An error occurred: {str(e)}")
+    st.info("Please try asking your question again.")
+```
+
+## Session Lifecycle
+
+1. **First Visit**: Session state is initialized with empty messages list
+2. **User Interaction**: Messages are appended to session state
+3. **Page Refresh**: Session state persists within the same browser session
+4. **Browser Close**: Session state is cleared
+5. **New Tab**: Creates a new independent session

@@ -1,0 +1,209 @@
+---
+title: "Retrieval Chains"
+description: "Building the RAG pipeline with retriever, LLM, and chain components"
+---
+
+## Overview
+
+The `chains.py` module constructs the Retrieval-Augmented Generation (RAG) pipeline by combining a vector store retriever with a language model and prompt template.
+
+<Info>
+This module creates the `rag_chain` that powers DeenPAL's question-answering capabilities.
+</Info>
+
+## Complete Module Code
+
+```python
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+
+from loader import load_and_prepare_data
+from prompts import qa_prompt
+
+load_dotenv()
+
+# Load Data and Initialize Vector Store
+db, embeddings = load_and_prepare_data()
+
+# Initialize Retriever
+retriever = db.as_retriever(
+    search_type="mmr",  # Use Maximal Marginal Relevance
+    search_kwargs={"k": 4, "fetch_k": 10}  # Retrieve top 4 diverse results from 10 candidates
+)
+
+# Initialize LLM
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+```
+
+## Component Breakdown
+
+### 1. Loading Data and Vector Store
+
+The module starts by loading the prepared data from the loader:
+
+```python
+from loader import load_and_prepare_data
+
+db, embeddings = load_and_prepare_data()
+```
+
+This retrieves the ChromaDB vector store containing all hadith embeddings.
+
+### 2. Retriever Initialization
+
+The retriever uses **Maximal Marginal Relevance (MMR)** for diverse results:
+
+```python
+retriever = db.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10}
+)
+```
+
+<Note>
+**MMR Parameters Explained:**
+- `search_type="mmr"`: Uses Maximal Marginal Relevance algorithm
+- `k=4`: Returns the top 4 most relevant and diverse documents
+- `fetch_k=10`: Initially fetches 10 candidates before applying MMR
+</Note>
+
+#### Why MMR?
+
+MMR balances relevance and diversity:
+
+1. **Relevance**: Documents are semantically similar to the query
+2. **Diversity**: Selected documents are different from each other
+3. **Result**: Users get comprehensive coverage without redundancy
+
+<Info>
+**Example:** If a user asks about prayer, MMR might return hadiths about:
+- Prayer times (relevant)
+- Prayer postures (relevant but different)
+- Group prayer (relevant but diverse)
+- Prayer invalidation (relevant and unique)
+
+Instead of 4 nearly identical hadiths about prayer times.
+</Info>
+
+### 3. LLM Initialization
+
+DeenPAL uses DeepSeek via OpenRouter for language generation:
+
+```python
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+```
+
+**Configuration:**
+- **Model**: DeepSeek Chat v3 (March 2024)
+- **API**: OpenRouter (provides unified access to multiple LLMs)
+- **Tier**: Free tier
+
+<Note>
+Environment variables (loaded via `load_dotenv()`) should include:
+- `OPENAI_API_KEY`: Your OpenRouter API key
+</Note>
+
+### 4. Document Chain Creation
+
+The `create_stuff_documents_chain` combines the LLM with the prompt template:
+
+```python
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+```
+
+This chain:
+1. Takes retrieved documents
+2. "Stuffs" them into the prompt template
+3. Sends the complete prompt to the LLM
+4. Returns the generated answer
+
+<Info>
+**"Stuff" Strategy:**
+The simplest document combination method - all retrieved documents are inserted directly into the prompt context.
+</Info>
+
+### 5. Retrieval Chain Creation
+
+The final `rag_chain` combines retrieval with generation:
+
+```python
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+```
+
+This creates a complete RAG pipeline:
+
+```
+User Query → Retriever → Retrieved Docs → Question-Answer Chain → LLM → Answer
+```
+
+## The RAG Pipeline Flow
+
+When a user asks a question:
+
+1. **Query Embedding**: User's question is converted to a vector
+2. **Retrieval**: MMR finds 4 diverse, relevant hadiths from ChromaDB
+3. **Context Building**: Retrieved documents are formatted into the prompt
+4. **LLM Generation**: DeepSeek generates an answer using the context
+5. **Response**: Answer is returned with source citations
+
+## Using the RAG Chain
+
+Other modules (like `app.py`) use the chain like this:
+
+```python
+from chains import rag_chain
+
+response = rag_chain.invoke({
+    "input": "What does Islam say about prayer?",
+    "chat_history": []
+})
+
+print(response["answer"])  # The generated answer
+print(response["context"])  # The retrieved documents
+```
+
+## Response Structure
+
+The `rag_chain` returns a dictionary:
+
+```python
+{
+    "input": "user's question",
+    "context": [retrieved_doc1, retrieved_doc2, ...],
+    "answer": "generated answer from LLM"
+}
+```
+
+<Note>
+The `context` field contains the actual hadith documents that were used to generate the answer.
+</Note>
+
+## Dependencies
+
+The module requires:
+
+```python
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+
+from loader import load_and_prepare_data
+from prompts import qa_prompt
+```
+
+- **LangChain**: For chain construction
+- **loader.py**: Provides the vector store
+- **prompts.py**: Provides the QA prompt template
+- **dotenv**: For environment variable management

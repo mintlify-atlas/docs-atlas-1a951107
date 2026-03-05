@@ -1,0 +1,184 @@
+---
+title: 'RAG Architecture'
+description: 'Understanding the Retrieval-Augmented Generation architecture in DeenPAL'
+---
+
+## What is Retrieval-Augmented Generation?
+
+Retrieval-Augmented Generation (RAG) is an AI architecture that combines the power of large language models (LLMs) with external knowledge retrieval. Instead of relying solely on the model's training data, RAG systems:
+
+1. **Retrieve** relevant information from a knowledge base
+2. **Augment** the user's query with retrieved context
+3. **Generate** accurate responses based on both the query and retrieved information
+
+<Info>
+RAG is particularly valuable for domain-specific applications where accuracy and source attribution are critical, such as Islamic knowledge systems.
+</Info>
+
+## How DeenPAL Implements RAG
+
+DeenPAL uses RAG to provide accurate Hadith-based responses by ensuring every answer is grounded in authentic Islamic sources (Sahih Al-Bukhari and Sahih Al-Muslim). This approach prevents the LLM from generating unsupported information.
+
+The system is designed to:
+- Deliver **personalized responses** tailored to user queries
+- Utilize **reliable sources** from trusted Hadith collections
+- Provide **citations** with book numbers, Hadith numbers, and chapters
+- Offer **explanations** that connect retrieved Hadiths to user questions
+
+## The RAG Pipeline
+
+DeenPAL's RAG architecture follows a four-stage pipeline:
+
+### 1. Data Loading
+
+Hadith PDFs are loaded from the `data/` directory and processed:
+
+```python
+# From loader.py
+folder_path = "data/"
+loader = PyPDFDirectoryLoader(folder_path)
+documents = loader.load()
+```
+
+Metadata is extracted and structured to identify sources:
+
+```python
+for doc in documents:
+    split_source = (doc.metadata['source'].split("/")[-1])
+    exact_source_with_ext = split_source.split('_', maxsplit=1)[1]
+    exact_source = exact_source_with_ext.split('.')[0]
+    doc.metadata = {'source': exact_source}
+```
+
+### 2. Text Splitting & Embedding
+
+Documents are split into semantic chunks based on Hadith structure:
+
+```python
+# From loader.py
+pattern = r"(?:Chapter\s\d+:)|(?:Book\s\d+,\sNumber\s\d+:)"
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000, 
+    chunk_overlap=0, 
+    separators=[pattern], 
+    is_separator_regex=True
+)
+chunks = text_splitter.split_documents(documents)
+```
+
+<Tip>
+DeenPAL uses regex-based splitting to preserve each Hadith as a complete semantic unit, rather than arbitrary character-based chunks. This maintains the integrity of each Hadith.
+</Tip>
+
+Embeddings are generated using a lightweight sentence transformer model:
+
+```python
+embeddings = HuggingFaceEmbeddings(
+    model_name='sentence-transformers/all-MiniLM-L6-v2'
+)
+```
+
+### 3. Vector Storage & Retrieval
+
+Embedded chunks are stored in ChromaDB for efficient similarity search:
+
+```python
+# From loader.py
+persist_directory = 'database/chroma_db'
+db = Chroma.from_documents(
+    documents=chunks, 
+    embedding=embeddings, 
+    persist_directory=persist_directory
+)
+```
+
+When a user asks a question, the retriever finds the most relevant Hadiths using Maximal Marginal Relevance (MMR):
+
+```python
+# From chains.py
+retriever = db.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 4, "fetch_k": 10}
+)
+```
+
+### 4. Response Generation
+
+The LLM receives the user's question along with retrieved Hadith context:
+
+```python
+# From chains.py
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+```
+
+## Benefits of RAG for Hadith Retrieval
+
+### 1. Accuracy & Attribution
+Every response is backed by authentic Hadith sources with proper citations, preventing hallucinations.
+
+### 2. Up-to-date Knowledge
+The system can be updated with new sources without retraining the LLM.
+
+### 3. Transparency
+Users can verify responses by checking the cited Hadith sources.
+
+### 4. Semantic Understanding
+The embedding model understands meaning, not just keywords, allowing for natural language queries.
+
+### 5. Scalability
+New Hadith collections can be added to the vector store without modifying the core system.
+
+<Note>
+DeenPAL uses caching with `@st.cache_resource` to ensure data loading happens only once per session, preventing redundant processing and improving response times.
+</Note>
+
+## Architecture Diagram
+
+```
+┌─────────────────┐
+│  User Query     │
+│  "What does     │
+│  Islam say..."  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────┐
+│           RETRIEVAL PHASE                       │
+│                                                 │
+│  1. Query → Embedding Model                     │
+│     (sentence-transformers/all-MiniLM-L6-v2)    │
+│                                                 │
+│  2. Vector Search in ChromaDB                   │
+│     (MMR: k=4 from fetch_k=10)                  │
+│                                                 │
+│  3. Retrieve Top 4 Diverse Hadiths              │
+└────────┬────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────┐
+│           GENERATION PHASE                      │
+│                                                 │
+│  1. Inject Retrieved Context into Prompt        │
+│                                                 │
+│  2. LLM Processes Query + Context               │
+│     (DeepSeek Chat via OpenRouter)              │
+│                                                 │
+│  3. Generate Response with Citations            │
+└────────┬────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│   Response:     │
+│   • Hadiths     │
+│   • Explanation │
+│   • Answer      │
+└─────────────────┘
+```
+
+This architecture ensures that every response is grounded in authentic Islamic sources while leveraging the natural language understanding capabilities of modern LLMs.

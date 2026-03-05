@@ -1,0 +1,208 @@
+---
+title: 'Retrieval Strategy'
+description: 'Understanding how DeenPAL retrieves relevant Hadiths using vector search and MMR'
+---
+
+## Vector Store Setup
+
+DeenPAL uses **ChromaDB** as its vector database to store and retrieve Hadith embeddings efficiently. ChromaDB is an open-source embedding database optimized for AI applications.
+
+### Initialization
+
+After documents are loaded and split into chunks, they are embedded and stored in ChromaDB:
+
+```python
+# From loader.py
+embeddings = HuggingFaceEmbeddings(
+    model_name='sentence-transformers/all-MiniLM-L6-v2'
+)
+
+persist_directory = 'database/chroma_db'
+db = Chroma.from_documents(
+    documents=chunks, 
+    embedding=embeddings, 
+    persist_directory=persist_directory
+)
+```
+
+<Info>
+The `persist_directory` parameter ensures that embeddings are saved to disk, so they don't need to be regenerated on every app restart.
+</Info>
+
+### How It Works
+
+1. Each Hadith chunk is converted to a 384-dimensional vector using the embedding model
+2. Vectors are stored in ChromaDB with associated metadata (source, Hadith number, chapter)
+3. At query time, the user's question is embedded using the same model
+4. ChromaDB performs fast similarity search to find relevant Hadiths
+
+## Embedding Model
+
+DeenPAL uses the **sentence-transformers/all-MiniLM-L6-v2** model for generating embeddings:
+
+```python
+embeddings = HuggingFaceEmbeddings(
+    model_name='sentence-transformers/all-MiniLM-L6-v2'
+)
+```
+
+### Why This Model?
+
+- **Lightweight**: Only 80MB, making it fast and efficient
+- **Semantic Understanding**: Trained on a large corpus to understand sentence meaning
+- **Multilingual Capable**: Can handle English text effectively
+- **Open Source**: Free to use and modify
+- **Quality**: Balances performance and speed for real-time retrieval
+
+<Tip>
+This model maps sentences to a 384-dimensional dense vector space where semantically similar sentences are close together, enabling meaningful similarity search.
+</Tip>
+
+## Maximal Marginal Relevance (MMR) vs Similarity Search
+
+DeenPAL uses **Maximal Marginal Relevance (MMR)** for retrieval instead of standard similarity search. Understanding the difference is crucial:
+
+### Similarity Search
+
+Standard similarity search returns documents that are most similar to the query:
+
+```python
+# Standard similarity search (NOT used in DeenPAL)
+retriever = db.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 4}
+)
+```
+
+**Problem**: This often returns redundant Hadiths that say almost the same thing, reducing the diversity of information provided.
+
+### Maximal Marginal Relevance (MMR)
+
+MMR balances relevance and diversity:
+
+```python
+# From chains.py
+retriever = db.as_retriever(
+    search_type="mmr",  # Use Maximal Marginal Relevance
+    search_kwargs={"k": 4, "fetch_k": 10}  # Retrieve top 4 diverse results from 10 candidates
+)
+```
+
+**How MMR Works**:
+1. Fetch the top `fetch_k=10` most similar Hadiths
+2. Select the first Hadith (most relevant)
+3. From remaining Hadiths, select ones that are:
+   - **Relevant** to the query
+   - **Diverse** from already selected Hadiths
+4. Repeat until `k=4` Hadiths are selected
+
+<Note>
+MMR uses a lambda parameter (default 0.5) to balance relevance vs diversity. Higher lambda favors relevance, lower lambda favors diversity.
+</Note>
+
+## Why MMR is Used
+
+The DeenPAL developers tested both approaches and found that MMR provides superior results:
+
+> "I tried both, and `MMR` **increased diversity** in retrieved Hadiths while maintaining relevance. Whereas using `similarity_score_threshold` was making the Chatbot give the same hadiths redundantly."
+
+### Benefits of MMR for DeenPAL
+
+1. **Diverse Perspectives**: Users receive different but relevant Hadiths, offering broader context
+2. **Reduced Redundancy**: Avoids repeating similar Hadiths
+3. **Better Answers**: LLM can synthesize information from varied sources
+4. **Richer Context**: More angles on a topic lead to comprehensive responses
+
+### Example Scenario
+
+User asks: *"What does Islam say about charity?"*
+
+**With Similarity Search**:
+- Hadith 1: About giving charity
+- Hadith 2: About giving charity (very similar to #1)
+- Hadith 3: About giving charity (very similar to #1 and #2)
+- Hadith 4: About giving charity (very similar to all above)
+
+**With MMR**:
+- Hadith 1: About giving charity
+- Hadith 2: About the rewards of charity
+- Hadith 3: About charity to family members
+- Hadith 4: About the best times for charity
+
+<Info>
+MMR ensures the LLM receives a well-rounded set of Hadiths, enabling more nuanced and comprehensive answers.
+</Info>
+
+## Retriever Configuration
+
+Here's the complete retriever setup from `chains.py`:
+
+```python
+# From chains.py
+from loader import load_and_prepare_data
+
+# Load Data and Initialize Vector Store
+db, embeddings = load_and_prepare_data()
+
+# Initialize Retriever
+retriever = db.as_retriever(
+    search_type="mmr",  # Use Maximal Marginal Relevance
+    search_kwargs={"k": 4, "fetch_k": 10}  # Retrieve top 4 diverse results from 10 candidates
+)
+```
+
+### Configuration Parameters
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `search_type` | `"mmr"` | Use Maximal Marginal Relevance algorithm |
+| `k` | `4` | Number of final Hadiths to return |
+| `fetch_k` | `10` | Number of candidates to consider for diversity |
+
+<Tip>
+The ratio `fetch_k / k = 10 / 4 = 2.5` gives MMR enough candidates to find diverse results while keeping computation efficient.
+</Tip>
+
+## Integration with RAG Chain
+
+The retriever is integrated into the RAG chain:
+
+```python
+# From chains.py
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_openai import ChatOpenAI
+from prompts import qa_prompt
+
+# Initialize LLM
+llm = ChatOpenAI(
+    model="deepseek/deepseek-chat-v3-0324:free",
+    base_url="https://openrouter.ai/api/v1"
+)
+
+# Create the chain
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+```
+
+This chain:
+1. Takes a user query
+2. Uses the retriever to fetch 4 diverse Hadiths
+3. Injects them into the prompt template
+4. Generates a response with citations and explanations
+
+## Performance Optimization
+
+DeenPAL uses Streamlit's caching to avoid reloading data:
+
+```python
+# From loader.py
+@st.cache_resource
+def load_and_prepare_data():
+    # ... data loading and embedding code ...
+    return db, embeddings
+```
+
+<Note>
+This ensures the vector store is initialized only once per app session, preventing redundant embedding generation and significantly improving response times.
+</Note>

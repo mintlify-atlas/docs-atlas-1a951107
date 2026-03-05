@@ -1,0 +1,136 @@
+---
+title: Installation
+description: Complete guide to installing DeenPAL and its dependencies
+---
+
+This guide will walk you through the installation process for DeenPAL, from setting up your environment to verifying the installation.
+
+## System Requirements
+
+Before you begin, ensure your system meets these requirements:
+
+- **Python:** Version 3.10 or higher
+- **Conda:** Anaconda or Miniconda for environment management
+- **Storage:** At least 2GB free space for dependencies and models
+- **Internet:** Required for downloading dependencies and embedding models
+
+<Note>
+DeenPAL uses the `sentence-transformers/all-MiniLM-L6-v2` embedding model, which will be downloaded automatically on first run.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone the DeenPAL repository from GitHub:
+    
+    ```bash
+    git clone https://github.com/Raza-Aziz/DeenPAL-RAG-based-Islamic-Hadith-Chatbot.git
+    cd DeenPAL-RAG-based-Islamic-Hadith-Chatbot
+    ```
+  </Step>
+
+  <Step title="Create Conda Environment">
+    Create a new conda environment with Python 3.10:
+    
+    ```bash
+    conda create -n deen-pal python=3.10 -y
+    ```
+    
+    This creates an isolated environment named `deen-pal` to avoid conflicts with other Python projects.
+  </Step>
+
+  <Step title="Activate Environment">
+    Activate the newly created environment:
+    
+    ```bash
+    conda activate deen-pal
+    ```
+    
+    <Note>
+    You'll need to activate this environment each time you work with DeenPAL.
+    </Note>
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required dependencies from the `colab_requirements.txt` file:
+    
+    <CodeGroup>
+    ```bash pip (Standard)
+    pip install -r colab_requirements.txt
+    ```
+    
+    ```bash uv (Faster)
+    pip install uv
+    uv pip install -r colab_requirements.txt
+    ```
+    </CodeGroup>
+    
+    <Note>
+    The `uv` package manager is faster than standard pip. The project author recommends using it for improved installation speed.
+    </Note>
+  </Step>
+</Steps>
+
+## Installed Dependencies
+
+The installation includes the following key packages:
+
+- **langchain** - Core LangChain framework
+- **langchain_community** - Community integrations
+- **langchain-huggingface** - HuggingFace embeddings integration
+- **langchain-openai** - OpenAI/OpenRouter LLM integration
+- **langchain-chroma** - ChromaDB vector store integration
+- **pypdf** - PDF document loading
+- **chromadb** - Vector database for embeddings
+- **streamlit** - Web interface framework
+- **huggingface-hub** - HuggingFace model downloads
+- **sentence-transformers** - Embedding models
+- **python-dotenv** - Environment variable management
+
+## Verifying Installation
+
+To verify that all dependencies are correctly installed, run:
+
+```bash
+python -c "import streamlit, langchain, chromadb; print('Installation successful!')"
+```
+
+If this command runs without errors, your installation is complete.
+
+<Warning>
+If you encounter any import errors, try reinstalling the specific package:
+```bash
+pip install --force-reinstall <package-name>
+```
+</Warning>
+
+## Next Steps
+
+Now that DeenPAL is installed, you can:
+
+1. [Prepare your Hadith data](/guides/data-preparation)
+2. [Configure your API keys](/guides/configuration)
+3. [Run the chatbot](/guides/running-chatbot)
+
+## Troubleshooting
+
+### Conda Not Found
+
+If you don't have Conda installed, download and install it from:
+- [Anaconda](https://www.anaconda.com/download) (full distribution)
+- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (minimal installer)
+
+### Package Installation Fails
+
+If package installation fails:
+1. Ensure you have the latest pip: `pip install --upgrade pip`
+2. Try installing packages individually to identify the problematic one
+3. Check your internet connection
+
+### Python Version Issues
+
+If you need a different Python version, create the environment with:
+```bash
+conda create -n deen-pal python=3.10.0 -y
+```

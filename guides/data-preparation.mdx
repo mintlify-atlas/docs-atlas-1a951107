@@ -1,0 +1,212 @@
+---
+title: Data Preparation
+description: Learn how to prepare Hadith PDFs for use with DeenPAL
+---
+
+DeenPAL uses PDF documents containing Islamic Hadiths as its knowledge base. This guide explains how to prepare and organize your Hadith data for optimal retrieval.
+
+## Overview
+
+The data preparation process involves:
+1. Placing Hadith PDFs in the correct directory
+2. Automatic PDF loading and parsing
+3. Metadata extraction and enrichment
+4. Semantic text splitting by chapter/book
+5. Embedding generation and vector storage
+
+## Supported Data Formats
+
+<Note>
+**Supported Format:** PDF only
+
+DeenPAL currently supports Hadith documents in PDF format. The system uses `PyPDFDirectoryLoader` to load all PDFs from the data directory.
+</Note>
+
+## Placing Hadith PDFs
+
+<Steps>
+  <Step title="Create Data Directory">
+    Ensure the `data/` directory exists in the project root:
+    
+    ```bash
+    mkdir -p data
+    ```
+  </Step>
+
+  <Step title="Add PDF Files">
+    Place your Hadith PDF files in the `data/` directory:
+    
+    ```
+    DeenPAL-RAG-based-Islamic-Hadith-Chatbot/
+    ├── data/
+    │   ├── Sahih_Bukhari_Vol1.pdf
+    │   ├── Sahih_Bukhari_Vol2.pdf
+    │   ├── Sahih_Muslim_Vol1.pdf
+    │   └── Sahih_Muslim_Vol2.pdf
+    ├── app.py
+    └── ...
+    ```
+  </Step>
+</Steps>
+
+## Recommended Sources
+
+The project author recommends using these authentic Hadith collections:
+
+- **Sahih Bukhari** (all volumes)
+- **Sahih Muslim** (all volumes)
+
+These are considered the most authentic Hadith collections in Islamic scholarship. You can use other Hadith collections as well, but ensure they're in PDF format.
+
+<Warning>
+Ensure your PDF files are text-based, not scanned images. The loader requires extractable text content.
+</Warning>
+
+## How the Loader Processes PDFs
+
+DeenPAL's `loader.py` module handles the entire data processing pipeline:
+
+### 1. PDF Loading
+
+```python
+folder_path = "data/"
+loader = PyPDFDirectoryLoader(folder_path)
+documents = loader.load()
+```
+
+The `PyPDFDirectoryLoader` automatically loads all PDF files from the `data/` directory.
+
+### 2. Metadata Extraction
+
+After loading, the system extracts and cleans metadata from each document:
+
+```python
+for doc in documents:
+    split_source = (doc.metadata['source'].split("/")[-1])
+    exact_source_with_ext = split_source.split('_', maxsplit=1)[1]
+    exact_source = exact_source_with_ext.split('.')[0]
+    doc.metadata = {'source': exact_source}
+```
+
+**Example:**
+- Original: `data/001_Sahih_Bukhari_Vol1.pdf`
+- Extracted: `Sahih Bukhari Vol1`
+
+This provides clean source attribution for each Hadith.
+
+### 3. Text Splitting Strategy
+
+DeenPAL uses **semantic splitting** based on Hadith structure rather than fixed character counts:
+
+```python
+pattern = r"(?:Chapter\s\d+:)|(?:Book\s\d+,\sNumber\s\d+:)"
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=0,
+    separators=[pattern],
+    is_separator_regex=True
+)
+chunks = text_splitter.split_documents(documents)
+```
+
+<Note>
+**Why Semantic Splitting?**
+
+Instead of splitting text at arbitrary character positions, this approach:
+- Splits at natural boundaries (Chapter/Book markers)
+- Keeps each Hadith intact as a single chunk
+- Preserves semantic meaning and context
+- Improves retrieval accuracy
+</Note>
+
+### 4. Hadith Number Extraction
+
+After splitting, the system extracts and adds Hadith numbers to metadata:
+
+```python
+for chunk in chunks:
+    matches = re.search(pattern, chunk.page_content)
+    if matches:
+        hadith_number = "".join([word for word in matches.group(0) if word.isdigit()])
+        chunk.metadata.update({'hadith_number': hadith_number})
+```
+
+This allows for precise citation in chatbot responses.
+
+### 5. Embedding Generation
+
+The system uses the `sentence-transformers/all-MiniLM-L6-v2` model to generate embeddings:
+
+```python
+embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
+```
+
+<Note>
+The embedding model is downloaded automatically on first run and cached locally for future use.
+</Note>
+
+### 6. Vector Store Initialization
+
+Finally, embeddings are stored in ChromaDB for efficient retrieval:
+
+```python
+persist_directory = 'database/chroma_db'
+db = Chroma.from_documents(
+    documents=chunks,
+    embedding=embeddings,
+    persist_directory=persist_directory
+)
+```
+
+The vector store is persisted to disk, so it only needs to be created once.
+
+## Caching for Performance
+
+The entire data loading process is cached using Streamlit's caching mechanism:
+
+```python
+@st.cache_resource
+def load_and_prepare_data():
+    # ... data loading logic
+```
+
+This ensures that:
+- Data is only processed **once per session**
+- Subsequent queries don't reload or re-embed data
+- The chatbot responds quickly after initial setup
+
+## File Naming Conventions
+
+While there's no strict naming requirement, consider using descriptive names:
+
+✅ **Good:**
+- `Sahih_Bukhari_Vol1.pdf`
+- `Sahih_Muslim_Complete.pdf`
+- `001_Jami_at_Tirmidhi.pdf`
+
+❌ **Avoid:**
+- `document1.pdf`
+- `hadith.pdf`
+- `untitled.pdf`
+
+Clear names help with source attribution in chatbot responses.
+
+## Verifying Data Preparation
+
+When you first run the application, you'll see console output indicating the data preparation progress:
+
+```
+1- Loading Hadith PDFs
+2- Documents loaded successfully.
+3- Documents split and metadata added.
+4- Chroma vector store initialized.
+```
+
+If you see all four messages, your data preparation was successful.
+
+## Next Steps
+
+With your data prepared, you can now:
+
+1. [Configure API keys](/guides/configuration)
+2. [Run the chatbot](/guides/running-chatbot)
