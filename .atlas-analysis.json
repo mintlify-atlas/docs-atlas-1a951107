@@ -1,0 +1,60 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "DeenPAL",
+  "projectDescription": "A RAG-based chatbot that provides accurate Islamic information from Hadith collections using retrieval-augmented generation.",
+  "theme": "almond",
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": ["concepts/rag-architecture", "concepts/retrieval-strategy", "concepts/prompt-design"]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/installation", "guides/data-preparation", "guides/configuration", "guides/running-chatbot"]
+          },
+          {
+            "group": "Components",
+            "pages": ["components/data-loader", "components/chains", "components/prompts", "components/streamlit-ui"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Modules",
+            "pages": ["api/loader", "api/chains", "api/prompts", "api/app"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Retrieval-Augmented Generation (RAG) architecture for accurate Hadith retrieval",
+    "Maximal Marginal Relevance (MMR) for diverse and relevant results",
+    "Semantic text splitting based on Hadith structure (chapters and book numbers)",
+    "ChromaDB vector store with sentence-transformers embeddings",
+    "Interactive Streamlit web interface with chat history",
+    "Integration with DeepSeek LLM via OpenRouter API",
+    "Support for Sahih Bukhari and Sahih Muslim collections"
+  ],
+  "publicApiSurface": [
+    "load_and_prepare_data() - Loads PDFs, creates embeddings, and initializes ChromaDB",
+    "rag_chain - Main RAG pipeline combining retrieval and generation",
+    "qa_prompt - ChatPromptTemplate for Islamic Q&A system",
+    "retriever - MMR-based retriever (k=4, fetch_k=10)",
+    "embeddings - HuggingFaceEmbeddings using all-MiniLM-L6-v2",
+    "db - Chroma vector store instance"
+  ]
+}
