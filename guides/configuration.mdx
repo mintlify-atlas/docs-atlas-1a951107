@@ -17,11 +17,15 @@ DeenPAL requires configuration before use, including API keys for the language m
   </Step>
 
   <Step title="Add API Key">
-    Open the `.env` file and add your API key:
+    Open the `.env` file and add your OpenRouter API key:
     
     ```bash .env
-    DEEPSEEK_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    OPENAI_API_KEY="your_openrouter_api_key_here"
     ```
+    
+    <Info>
+    DeenPAL uses OpenRouter to access the DeepSeek model. The `ChatOpenAI` class from LangChain expects the `OPENAI_API_KEY` environment variable.
+    </Info>
     
     <Warning>
     Keep your `.env` file secure and never commit it to version control. Add it to `.gitignore`.
@@ -46,7 +50,7 @@ To use this configuration:
 
 1. Sign up at [OpenRouter](https://openrouter.ai/)
 2. Get your API key from the dashboard
-3. Add it to your `.env` file as `DEEPSEEK_API_KEY`
+3. Add it to your `.env` file as `OPENAI_API_KEY`
 
 <Note>
 The `deepseek-chat-v3-0324:free` model is used, which provides free access through OpenRouter.

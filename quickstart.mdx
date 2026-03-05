@@ -44,11 +44,15 @@ Follow these steps to install and set up DeenPAL:
   </Step>
 
   <Step title="Configure environment variables">
-    Create a `.env` file in the root directory and add your API key:
+    Create a `.env` file in the root directory and add your OpenRouter API key:
 
     ```bash .env
-    DEEPSEEK_API_KEY="xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    OPENAI_API_KEY="your_openrouter_api_key_here"
     ```
+
+    <Info>
+      DeenPAL uses OpenRouter to access the DeepSeek model. Get your API key from [OpenRouter](https://openrouter.ai/).
+    </Info>
 
     <Warning>
       Keep your API key secure and never commit the `.env` file to version control. Add it to `.gitignore` if not already included.
@@ -113,8 +117,12 @@ Once installation is complete, you can start the chatbot:
     Open your web browser and navigate to:
 
     ```
-    http://localhost:8080
+    http://localhost:8501
     ```
+
+    <Note>
+      Streamlit runs on port 8501 by default. If you need to use a different port, run `streamlit run app.py --server.port 8080`.
+    </Note>
 
     You should see the **Deen Pal Chatbot** interface.
   </Step>
